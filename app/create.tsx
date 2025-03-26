@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, Button } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
+
 
 export default function CreateDeckScreen() {
   const [deckTitle, setDeckTitle] = useState('');
   const [deckColor, setDeckColor] = useState('lightblue'); 
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#ceefff", padding: 20 }}>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#cbd5e1", padding: 20 }}>
 
       <Text style={styles.title}>Deck erstellen</Text>
 
@@ -24,7 +26,7 @@ export default function CreateDeckScreen() {
           <Text style={styles.colorButtonText}>Light Blue</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.colorButton, { backgroundColor: 'lightcoral' }]} onPress={() => setDeckColor('lightcoral')}>
-          <Text style={styles.colorButtonText}>Light Coral</Text>
+          <Text style={styles.colorButtonText}>Light Red</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.colorButton, { backgroundColor: 'lightpink' }]} onPress={() => setDeckColor('lightpink')}>
           <Text style={styles.colorButtonText}>Light Pink</Text>
@@ -33,6 +35,7 @@ export default function CreateDeckScreen() {
           <Text style={styles.colorButtonText}>Light Green</Text>
         </TouchableOpacity>
       </View>
+
 
         <TouchableOpacity style={[styles.createButton, { backgroundColor: deckColor, width: '100%' }]} onPress={async () => { 
 
@@ -98,7 +101,7 @@ const styles = StyleSheet.create({
     borderColor: 'gray',
   },
   colorButtonText: {
-    color: 'black', // Text color for visibility
+    color: 'black', 
     textAlign: 'center',
   },
     createButton: {
