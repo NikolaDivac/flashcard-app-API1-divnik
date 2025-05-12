@@ -1,81 +1,50 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-interface Card {
-  question: string;
-  answer: string;
-}
+import { useNavigation, useRoute } from '@react-navigation/native';
 
-interface Deck {
-  id: string;
-  title: string;
-  color?: string;
-  cards: Card[];
-}
+const DeckDetail = () => {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const deckId = route?.params?.deckId || null;
 
-function FlipCard({ question, answer }: Readonly<Card>) {
-  const [flipped, setFlipped] = useState(false);
-
-  return (
-    <TouchableOpacity onPress={() => setFlipped(!flipped)} style={styles.card}>
-      <Text style={styles.cardContent}>
-        {flipped ? answer : question}
-      </Text>
-      <Text style={styles.flipHint}>
-        {flipped ? 'Tippe für Frage' : 'Tippe für Antwort'}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
-export default function DeckDetailScreen() {
-  const { deckId } = useLocalSearchParams();
-  const [deck, setDeck] = useState<Deck | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [deck, setDeck] = useState(null);
 
   useEffect(() => {
-    const loadDeck = async () => {
+    if (!deckId) {
+      Alert.alert('Fehler', 'Deck-ID ist nicht vorhanden.');
+      if (navigation?.goBack) {
+        navigation.goBack(); // Fallback
+      }
+      return;
+    }
+
+    const fetchDeck = async () => {
       try {
         const storedDecks = await AsyncStorage.getItem('decks');
-        if (storedDecks) {
-          const decks: Deck[] = JSON.parse(storedDecks);
-          const selectedDeck = decks.find((d) => d.id === deckId);
-          setDeck(selectedDeck || null);
+        const decks = storedDecks ? JSON.parse(storedDecks) : [];
+        const selectedDeck = decks.find((d) => d.id === deckId);
+        if (selectedDeck) {
+          setDeck(selectedDeck);
+        } else {
+          Alert.alert('Fehler', 'Deck nicht gefunden.');
+          if (navigation?.goBack) {
+            navigation.goBack(); // Fallback
+          }
         }
       } catch (error) {
-        console.error('Fehler beim Laden:', error);
-      } finally {
-        setLoading(false);
+        console.error('Fehler beim Laden des Decks:', error);
       }
     };
 
-    loadDeck();
+    fetchDeck();
   }, [deckId]);
-
-  const deleteCard = async (cardIndex: number) => {
-    if (!deck) return;
-    const updatedCards = deck.cards.filter((_, index) => index !== cardIndex);
-    const updatedDeck = { ...deck, cards: updatedCards };
-    setDeck(updatedDeck);
-
-    try {
-      const storedDecks = await AsyncStorage.getItem('decks');
-      if (storedDecks) {
-        let decks: Deck[] = JSON.parse(storedDecks);
-        decks = decks.map((d) => (d.id === deckId ? updatedDeck : d));
-        await AsyncStorage.setItem('decks', JSON.stringify(decks));
-      }
-    } catch (error) {
-      console.error('Fehler beim Löschen der Karte:', error);
-    }
-  };
 
   const deleteDeck = async () => {
     Alert.alert(
       'Deck löschen',
-      'Möchtest du dieses Deck wirklich löschen?',
+      'Möchten Sie dieses Deck wirklich löschen?',
       [
         { text: 'Abbrechen', style: 'cancel' },
         {
@@ -84,11 +53,11 @@ export default function DeckDetailScreen() {
           onPress: async () => {
             try {
               const storedDecks = await AsyncStorage.getItem('decks');
-              if (storedDecks) {
-                let decks: Deck[] = JSON.parse(storedDecks);
-                decks = decks.filter((d) => d.id !== deckId);
-                await AsyncStorage.setItem('decks', JSON.stringify(decks));
-                router.push('/');
+              const decks = storedDecks ? JSON.parse(storedDecks) : [];
+              const updatedDecks = decks.filter((d) => d.id !== deckId);
+              await AsyncStorage.setItem('decks', JSON.stringify(updatedDecks));
+              if (navigation?.goBack) {
+                navigation.goBack(); // Zurück zur Startseite
               }
             } catch (error) {
               console.error('Fehler beim Löschen des Decks:', error);
@@ -99,141 +68,41 @@ export default function DeckDetailScreen() {
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Lädt...</Text>
-      </View>
-    );
-  }
-
   if (!deck) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Deck nicht gefunden.</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.push('/')}>
-          <Text style={styles.backButtonText}>Zurück zur Startseite</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    return <Text style={styles.loader}>Laden...</Text>;
   }
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => router.push('/')}
-      >
-        <Text style={styles.backButtonText}>Zurück</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.deleteDeckButton}
-        onPress={deleteDeck}
-      >
-        <Text style={styles.deleteDeckButtonText}>Deck löschen</Text>
-      </TouchableOpacity>
-
       <Text style={styles.title}>{deck.title}</Text>
-
       <FlatList
-        data={deck?.cards || []} // Use an empty array if deck.cards is undefined
-        keyExtractor={(_, index) => index.toString()}
-        renderItem={({ item, index }) => (
-          <View>
-            <FlipCard question={item.question} answer={item.answer} />
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => deleteCard(index)}
-            >
-              <Text style={styles.deleteButtonText}>Karte löschen</Text>
-            </TouchableOpacity>
-          </View>
+        data={deck.cards ?? []}
+        renderItem={({ item }) => (
+          <TouchableOpacity style={styles.card}>
+            <Text style={styles.cardText}>{item.word}</Text>
+            <Text style={styles.cardMeaning}>{item.meaning}</Text>
+          </TouchableOpacity>
         )}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.cardList}
       />
+      <TouchableOpacity style={styles.deleteButton} onPress={deleteDeck}>
+        <Text style={styles.deleteButtonText}>Deck löschen</Text>
+      </TouchableOpacity>
     </View>
   );
-}
+};
+
+export default DeckDetail;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    backgroundColor: '#eee9dc',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    fontFamily: 'Georgia',
-    color: '#000',
-    textAlign: 'center',
-    marginTop: 120,
-    marginBottom: -100,
-    top: -140,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 15,
-    left: 15,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#ccc',
-    borderRadius: 8,
-  },
-  backButtonText: {
-    fontSize: 14,
-    fontFamily: 'Verdana',
-    color: '#000',
-    fontWeight: '500',
-  },
-  deleteDeckButton: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#d63031',
-    borderRadius: 8,
-  },
-  deleteDeckButtonText: {
-    color: '#fff',
-    fontFamily: 'Verdana',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  card: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 160,
-  },
-  cardContent: {
-    fontSize: 16,
-    fontFamily: 'Georgia',
-    textAlign: 'center',
-  },
-  flipHint: {
-    marginTop: 10,
-    fontSize: 12,
-    fontFamily: 'Verdana',
-    color: '#999',
-  },
-  deleteButton: {
-    backgroundColor: '#ff6b6b',
-    padding: 10,
-    borderRadius: 8,
-    marginVertical: 5,
-    alignSelf: 'center',
-    width: '50%',
-    alignItems: 'center',
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontFamily: 'Verdana',
-    fontWeight: 'bold',
-  },
+  container: { flex: 1, backgroundColor: '#fff', padding: 10 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
+  cardList: { padding: 10 },
+  card: { padding: 20, backgroundColor: '#f9f9f9', borderRadius: 10, marginBottom: 10 },
+  cardText: { fontSize: 18, fontWeight: 'bold' },
+  cardMeaning: { fontSize: 16, color: '#555' },
+  deleteButton: { backgroundColor: 'red', padding: 15, borderRadius: 5, alignItems: 'center', marginTop: 20 },
+  deleteButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
